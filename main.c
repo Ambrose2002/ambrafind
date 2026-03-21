@@ -26,7 +26,10 @@ int main() {
         snprintf(path, sizeof(path), "%s%s", base, output_buffer);
 
         if (stat(path, &st) == 0) {
-            printf("%s: %lld bytes\n", output_buffer, (long long)st.st_size);
+            printf("%s: %lld bytes, last_modified: %ld\n", 
+                output_buffer, 
+                (long long)st.st_size, 
+                st.st_mtimespec.tv_sec);
         }
     }
 
