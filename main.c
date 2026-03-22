@@ -1,39 +1,88 @@
-
+#include <dirent.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
 #include <string.h>
+#include <sys/stat.h>
 
-int main() {
-    FILE *fp;
-    struct stat st;
+static char *output = NULL;
+static size_t output_len = 0;
+static size_t output_cap = 0;
+static long file_count = 0;
 
-    char output_buffer[128];
+static int append_path(const char *path) {
 
-    const char *command = "ls";
+    file_count ++;
+    size_t path_len = strlen(path);
+    size_t needed = output_len + path_len + 1; // terminator
 
-    fp = popen(command, "r");
-    if (fp == NULL) {
-        perror("popen failed");
-        return EXIT_FAILURE;
+    if (needed > output_cap) {
+        size_t new_cap = output_cap == 0 ? 1024 : output_cap;
+        while (new_cap < needed) {
+            new_cap *= 2;
+        }
+
+        char *new_output = realloc(output, new_cap);
+        if (new_output == NULL) {
+            return -1;
+        }
+
+        output = new_output;
+        output_cap = new_cap;
     }
 
-    while (fgets(output_buffer, sizeof(output_buffer), fp) != NULL) {
-        char base[] = "/Users/ambroseblay/Developer/ambrafind/";
-        char path[512];
+    memcpy(output + output_len, path, path_len);
+    output_len += path_len;
+    output[output_len] = '\0';
+    return 0;
+}
 
-        output_buffer[strcspn(output_buffer, "\n")] = '\0'; 
-        snprintf(path, sizeof(path), "%s%s", base, output_buffer);
+void getFilePaths(const char *base) {
+    DIR *dir = opendir(base);
+    struct stat st;
 
-        if (stat(path, &st) == 0) {
-            printf("%s: %lld bytes, last_modified: %ld\n", 
-                output_buffer, 
-                (long long)st.st_size, 
-                st.st_mtimespec.tv_sec);
+    if (dir == NULL) {
+        perror("opendir failed");
+        return;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || 
+        strcmp(entry->d_name, "..") == 0 || 
+        strcmp(entry->d_name, ".git") == 0 ||
+        strcmp(entry->d_name, "build") == 0) {
+            continue;
+        }
+
+        char path[PATH_MAX];
+        int written = snprintf(path, sizeof(path), "%s/%s", base, entry->d_name);
+        if (written < 0 || (size_t)written >= sizeof(path)) {
+            continue;
+        }
+
+        if (stat(path, &st) != 0) {
+            continue;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            getFilePaths(path);
+        } else if (append_path(path) != 0) {
+            perror("realloc failed");
+            closedir(dir);
+            return;
         }
     }
 
-    pclose(fp);
-    
+    closedir(dir);
+}
+
+int main(void) {
+    const char *base = "/Users/ambroseblay";
+    getFilePaths(base);
+    if (output != NULL) {
+        printf("%ld files found", file_count);
+    }
+    free(output);
     return 0;
 }
