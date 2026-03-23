@@ -19,3 +19,23 @@ typedef struct {
     uint32_t file_id;
     uint8_t field_mask;
 } Posting;
+
+typedef struct {
+    char magic[4];
+    uint32_t version;
+    uint32_t file_count;
+    uint32_t dict_count;
+    uint32_t postings_count;
+    uint32_t file_records_offset;
+    uint32_t string_blob_offset;
+    uint32_t postings_offset;
+} IndexHeader;
+
+
+typedef struct {
+    IndexHeader header;
+    FileRecord *files;
+    char* string_blob;
+    DictEntry *dict;
+    Posting *postings;
+} LoadedIndex;
