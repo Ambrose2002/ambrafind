@@ -1,5 +1,7 @@
+#ifndef MY_FUNCTIONS_H
+#define MY_FUNCTIONS_H
 
-#include <cstdint>
+#include <stdint.h>
 
 typedef struct {
     uint32_t token_offset;
@@ -35,7 +37,14 @@ typedef struct {
 typedef struct {
     IndexHeader header;
     FileRecord *files;
-    char* string_blob;
+    char *string_blob;
     DictEntry *dict;
     Posting *postings;
 } LoadedIndex;
+
+void getFilePaths(const char *base);
+const char *get_output(void);
+long get_file_count(void);
+void clear_file_paths(void);
+
+#endif // MY_FUNCTIONS_H
