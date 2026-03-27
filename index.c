@@ -11,13 +11,13 @@
 static char *output = NULL;
 static size_t output_len = 0;
 static size_t output_cap = 0;
-static long file_count = 0;
+static FileRecord *file_records = NULL;
+static size_t file_records_len = 0;
+static size_t file_records_cap = 0;
 
-static int append_path(const char *path) {
-
-  file_count++;
-  size_t path_len = strlen(path);
-  size_t needed = output_len + path_len + 1; // terminator
+static int append_string(const char *value, uint32_t *offset) {
+  size_t value_len = strlen(value);
+  size_t needed = output_len + value_len + 1; // terminator
 
   if (needed > output_cap) {
     size_t new_cap = output_cap == 0 ? 1024 : output_cap;
@@ -34,13 +34,35 @@ static int append_path(const char *path) {
     output_cap = new_cap;
   }
 
-  memcpy(output + output_len, path, path_len);
-  output_len += path_len;
-  output[output_len] = '\0';
+  if (offset != NULL) {
+    if (output_len > UINT32_MAX) {
+      return -1;
+    }
+    *offset = (uint32_t)output_len;
+  }
+
+  memcpy(output + output_len, value, value_len + 1);
+  output_len += value_len + 1;
   return 0;
 }
 
-void getFilePaths(const char *base) {
+static int append_file_record(const FileRecord *record) {
+  if (file_records_len == file_records_cap) {
+    size_t new_cap = file_records_cap == 0 ? 128 : file_records_cap * 2;
+    FileRecord *new_records = realloc(file_records, new_cap * sizeof(FileRecord));
+    if (new_records == NULL) {
+      return -1;
+    }
+
+    file_records = new_records;
+    file_records_cap = new_cap;
+  }
+
+  file_records[file_records_len++] = *record;
+  return 0;
+}
+
+void buildBlob(const char *base) {
   DIR *dir = opendir(base);
   struct stat st;
 
@@ -68,11 +90,43 @@ void getFilePaths(const char *base) {
     }
 
     if (S_ISDIR(st.st_mode)) {
-      getFilePaths(path);
-    } else if (append_path(path) != 0) {
-      perror("realloc failed");
-      closedir(dir);
-      return;
+      buildBlob(path);
+    } else {
+      const char *filename = entry->d_name;
+      const char *dot = strrchr(filename, '.');
+      const char *ext =
+          (dot != NULL && dot != filename && dot[1] != '\0') ? dot + 1 : "";
+
+      FileRecord fr = {0};
+      int code = append_string(filename, &fr.filename_offset);
+      if (code != 0) {
+        perror("realloc failed");
+        closedir(dir);
+        return;
+      }
+
+      code = append_string(path, &fr.path_offset);
+      if (code != 0) {
+        perror("realloc failed");
+        closedir(dir);
+        return;
+      }
+
+      code = append_string(ext, &fr.ext_offset);
+      if (code != 0) {
+        perror("realloc failed");
+        closedir(dir);
+        return;
+      }
+
+      fr.size = (uint64_t)st.st_size;
+      fr.mtime = (int64_t)st.st_mtime;
+      code = append_file_record(&fr);
+      if (code != 0) {
+        perror("realloc failed");
+        closedir(dir);
+        return;
+      }
     }
   }
 
@@ -81,12 +135,17 @@ void getFilePaths(const char *base) {
 
 const char *get_output(void) { return output; }
 
-long get_file_count(void) { return file_count; }
+const FileRecord *get_file_records(void) { return file_records; }
+
+long get_file_count(void) { return (long)file_records_len; }
 
 void clear_file_paths(void) {
   free(output);
+  free(file_records);
   output = NULL;
+  file_records = NULL;
   output_len = 0;
   output_cap = 0;
-  file_count = 0;
+  file_records_len = 0;
+  file_records_cap = 0;
 }

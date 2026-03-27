@@ -4,8 +4,8 @@
 #include "index.h"
 
 int main(void) {
-    const char *base = "/Users/ambroseblay";
-    getFilePaths(base);
+    const char *base = "/Users/ambroseblay/developer/ambrafind";
+    buildBlob(base);
     if (get_output() != NULL) {
         printf("%ld files found\n", get_file_count());
     }

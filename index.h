@@ -42,8 +42,9 @@ typedef struct {
     Posting *postings;
 } LoadedIndex;
 
-void getFilePaths(const char *base);
+void buildBlob(const char *base);
 const char *get_output(void);
+const FileRecord *get_file_records(void);
 long get_file_count(void);
 void clear_file_paths(void);
 
