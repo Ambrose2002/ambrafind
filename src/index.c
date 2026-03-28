@@ -6,7 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "index.h"
+#include "../include/index.h"
 
 static char *output = NULL;
 static size_t output_len = 0;

@@ -1,7 +1,7 @@
 
 #include <stdio.h>
 
-#include "index.h"
+#include "../include/index.h"
 
 int main(void) {
     const char *base = "/Users/ambroseblay/developer/ambrafind";
