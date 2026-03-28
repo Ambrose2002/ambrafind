@@ -2,6 +2,7 @@
 #define MY_FUNCTIONS_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef struct {
     uint32_t token_offset;
@@ -42,10 +43,12 @@ typedef struct {
     Posting *postings;
 } LoadedIndex;
 
-void buildBlob(const char *base);
+void build_blob(const char *base);
 const char *get_output(void);
 const FileRecord *get_file_records(void);
 long get_file_count(void);
 void clear_file_paths(void);
+size_t get_output_len(void);
+void print_blob_and_records(const char *blob);
 
 #endif // MY_FUNCTIONS_H
