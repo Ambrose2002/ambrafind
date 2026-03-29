@@ -1,6 +1,8 @@
 
 #include <stdio.h>
 
+#define STB_DS_IMPLEMENTATION
+#include "../lib/stb_ds.h"
 #include "../include/index.h"
 
 int main(void) {

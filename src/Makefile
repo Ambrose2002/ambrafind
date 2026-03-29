@@ -1,6 +1,7 @@
 IDIR = ../include
+LIBS = ../lib
 CC = gcc
-CFLAGS = -I$(IDIR)
+CFLAGS = -I$(IDIR) -I$(LIBS)
 
 ODIR = obj
 TARGET = ../ambrafind.out
