@@ -7,7 +7,7 @@
 
 
 int main(void) {
-	const char *base = "/Users/ambroseblay/developer/ambrafind/include";
+	const char *base = "/Users/ambroseblay/developer/ambrafind";
 
 	build_blob(base);
 

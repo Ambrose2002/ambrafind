@@ -22,14 +22,27 @@ static uint64_t curr_file_id = 0;
 
 TokenMap *token_map = NULL;
 
-void print_my_map(TokenMap *map) {
+static char *duplicate_string(const char *src) {
+	size_t len = strlen(src) + 1;
+	char *copy = malloc(len);
+	if (copy != NULL) {
+		memcpy(copy, src, len);
+	}
+	return copy;
+}
 
-	for (int i = 0; i < shlen(map); ++i) {
+void print_my_map(TokenMap *map) {
+	if (map == NULL) {
+		printf("(token map is empty)\n");
+		return;
+	}
+
+	for (ptrdiff_t i = 0; i < shlen(map); ++i) {
 		printf("Key: %s\n", map[i].key);
 
-		int count = arrlen(map[i].value);
-		for (int j = 0; j < count; ++j) {
-			printf("  [%d] ID: %lld, Val: %s", j, map[i].value[j].file_id,
+		ptrdiff_t count = arrlen(map[i].value);
+		for (ptrdiff_t j = 0; j < count; ++j) {
+			printf("  [%td] ID: %" PRIu64 ", Val: %s\n", j, map[i].value[j].file_id,
 			       map[i].value[j].filepath);
 		}
 	}
@@ -113,6 +126,10 @@ void build_path_map(IndexedFile ifile) {
 	strcpy(path, ifile.path);
 	const char delimeter[] = "/.";
 
+	if (token_map == NULL) {
+		sh_new_strdup(token_map);
+	}
+
 	char *token;
 
 	token = strtok(path, delimeter);
@@ -123,7 +140,12 @@ void build_path_map(IndexedFile ifile) {
 			shput(token_map, token, NULL);
 			entry = shgetp(token_map, token);
 		}
-		TokenValue value = {ifile.file_id, ifile.path};
+		char *stable_path = duplicate_string(ifile.path);
+		if (stable_path == NULL) {
+			perror("malloc failed");
+			return;
+		}
+		TokenValue value = {ifile.file_id, stable_path};
 		arrput(entry->value, value);
 
 		token = strtok(NULL, delimeter);
@@ -219,6 +241,18 @@ size_t get_output_len(void) { return output_len; }
 TokenMap* get_token_map(void) { return token_map;}
 
 void clear_file_paths(void) {
+	if (token_map != NULL) {
+		for (ptrdiff_t i = 0; i < shlen(token_map); ++i) {
+			TokenValue *values = token_map[i].value;
+			for (ptrdiff_t j = 0; j < arrlen(values); ++j) {
+				free(values[j].filepath);
+			}
+			arrfree(values);
+		}
+		shfree(token_map);
+		token_map = NULL;
+	}
+
 	free(output);
 	free(file_records);
 	output = NULL;
@@ -227,4 +261,5 @@ void clear_file_paths(void) {
 	output_cap = 0;
 	file_records_len = 0;
 	file_records_cap = 0;
+	curr_file_id = 0;
 }
