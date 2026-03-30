@@ -3,6 +3,13 @@ LIBS = ../lib
 CC = gcc
 CFLAGS = -I$(IDIR) -I$(LIBS)
 
+DEBUG ?= 0
+ifeq ($(DEBUG), 1)
+    CFLAGS += -g -DDEBUG
+else
+    CFLAGS += -O2
+endif
+
 ODIR = obj
 TARGET = ../ambrafind.out
 

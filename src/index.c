@@ -7,8 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syslimits.h>
 
 #include "../include/index.h"
+#include "../lib/stb_ds.h"
 
 static char *output = NULL;
 static size_t output_len = 0;
@@ -17,6 +19,46 @@ static FileRecord *file_records = NULL;
 static size_t file_records_len = 0;
 static size_t file_records_cap = 0;
 static uint64_t curr_file_id = 0;
+
+TokenMap *token_map = NULL;
+
+void print_my_map(TokenMap *map) {
+
+	for (int i = 0; i < shlen(map); ++i) {
+		printf("Key: %s\n", map[i].key);
+
+		int count = arrlen(map[i].value);
+		for (int j = 0; j < count; ++j) {
+			printf("  [%d] ID: %lld, Val: %s", j, map[i].value[j].file_id,
+			       map[i].value[j].filepath);
+		}
+	}
+}
+
+void print_blob_and_records(const char *blob) {
+	size_t blob_len = get_output_len();
+	const FileRecord *recs = get_file_records();
+	long n = get_file_count();
+
+	printf("string_blob (%zu bytes):\n", blob_len);
+	for (size_t i = 0; i < blob_len; i++) {
+		unsigned char c = (unsigned char)blob[i];
+		if (c == '\0')
+			printf("\\0\n");
+		else
+			putchar(c);
+	}
+
+	printf("\nfile_records (%ld):\n", n);
+	for (long i = 0; i < n; i++) {
+		const FileRecord *r = &recs[i];
+		printf("[%ld] fn@%u=\"%s\" path@%u=\"%s\" ext@%u=\"%s\" size=%" PRIu64
+		       " mtime=%" PRId64 "\n",
+		       i, r->filename_offset, blob + r->filename_offset, r->path_offset,
+		       blob + r->path_offset, r->ext_offset, blob + r->ext_offset,
+		       r->size, r->mtime);
+	}
+}
 
 static int append_string(const char *value, uint32_t *offset) {
 	size_t value_len = strlen(value);
@@ -64,6 +106,28 @@ static int append_file_record(const FileRecord *record) {
 
 	file_records[file_records_len++] = *record;
 	return 0;
+}
+
+void build_path_map(IndexedFile ifile) {
+	char path[PATH_MAX];
+	strcpy(path, ifile.path);
+	const char delimeter[] = "/.";
+
+	char *token;
+
+	token = strtok(path, delimeter);
+
+	while (token != NULL) {
+		TokenMap *entry = shgetp_null(token_map, token);
+		if (!entry) {
+			shput(token_map, token, NULL);
+			entry = shgetp(token_map, token);
+		}
+		TokenValue value = {ifile.file_id, ifile.path};
+		arrput(entry->value, value);
+
+		token = strtok(NULL, delimeter);
+	}
 }
 
 void build_blob(const char *base) {
@@ -135,14 +199,9 @@ void build_blob(const char *base) {
 			// 	return;
 			//   }
 
-			IndexedFile ifile = {
-				curr_file_id++,
-				(char *)path,
-				(char *)filename,
-				(char *)ext,
-				st.st_size,
-				st.st_mtime
-			};
+			IndexedFile ifile = {curr_file_id++, (char *)path, (char *)filename,
+			                     (char *)ext,    st.st_size,   st.st_mtime};
+			build_path_map(ifile);
 		}
 	}
 
@@ -157,30 +216,7 @@ long get_file_count(void) { return (long)file_records_len; }
 
 size_t get_output_len(void) { return output_len; }
 
-void print_blob_and_records(const char *blob) {
-	size_t blob_len = get_output_len();
-	const FileRecord *recs = get_file_records();
-	long n = get_file_count();
-
-	printf("string_blob (%zu bytes):\n", blob_len);
-	for (size_t i = 0; i < blob_len; i++) {
-		unsigned char c = (unsigned char)blob[i];
-		if (c == '\0')
-			printf("\\0\n");
-		else
-			putchar(c);
-	}
-
-	printf("\nfile_records (%ld):\n", n);
-	for (long i = 0; i < n; i++) {
-		const FileRecord *r = &recs[i];
-		printf("[%ld] fn@%u=\"%s\" path@%u=\"%s\" ext@%u=\"%s\" size=%" PRIu64
-		       " mtime=%" PRId64 "\n",
-		       i, r->filename_offset, blob + r->filename_offset, r->path_offset,
-		       blob + r->path_offset, r->ext_offset, blob + r->ext_offset,
-		       r->size, r->mtime);
-	}
-}
+TokenMap* get_token_map(void) { return token_map;}
 
 void clear_file_paths(void) {
 	free(output);
