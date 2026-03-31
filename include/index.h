@@ -7,7 +7,7 @@
 #ifdef DEBUG
 	#define DEBUG_PRINT(...) printf(__VA_ARGS__)
 #else
-	#define DEBUG_PRINT(...) // Does nothing in release mode
+	#define DEBUG_PRINT(...)
 #endif
 
 typedef struct {
@@ -39,14 +39,8 @@ typedef struct {
 } Posting;
 
 typedef struct {
-	Posting *data;
-	size_t len;
-	size_t cap;
-} PostingVec;
-
-typedef struct {
-	char *token;
-	PostingVec postings;
+	char *key;
+	Posting* value;
 } TokenEntry;
 
 typedef struct {
@@ -68,16 +62,6 @@ typedef struct {
 	Posting *postings;
 } LoadedIndex;
 
-typedef struct {
-	uint64_t file_id;
-	char* filepath;
-} TokenValue;
-
-typedef struct {
-	char* key;
-	TokenValue* value;
-} TokenMap;
-
 void build_blob(const char *base);
 const char *get_output(void);
 const FileRecord *get_file_records(void);
@@ -85,8 +69,8 @@ long get_file_count(void);
 void clear_file_paths(void);
 size_t get_output_len(void);
 void print_blob_and_records(const char *blob);
-void print_my_map(TokenMap *map);
+void print_my_map(TokenEntry *map);
 void build_path_map(IndexedFile ifile);
-TokenMap* get_token_map(void);
+TokenEntry* get_token_map(void);
 
 #endif // MY_FUNCTIONS_H

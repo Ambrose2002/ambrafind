@@ -20,7 +20,7 @@ static size_t file_records_len = 0;
 static size_t file_records_cap = 0;
 static uint64_t curr_file_id = 0;
 
-TokenMap *token_map = NULL;
+TokenEntry *token_map = NULL;
 
 static char *duplicate_string(const char *src) {
 	size_t len = strlen(src) + 1;
@@ -31,7 +31,7 @@ static char *duplicate_string(const char *src) {
 	return copy;
 }
 
-void print_my_map(TokenMap *map) {
+void print_my_map(TokenEntry *map) {
 	if (map == NULL) {
 		printf("(token map is empty)\n");
 		return;
@@ -42,8 +42,8 @@ void print_my_map(TokenMap *map) {
 
 		ptrdiff_t count = arrlen(map[i].value);
 		for (ptrdiff_t j = 0; j < count; ++j) {
-			printf("  [%td] ID: %" PRIu64 ", Val: %s\n", j, map[i].value[j].file_id,
-			       map[i].value[j].filepath);
+			printf("  [%td] ID: %d, Field_Mask: %d\n", j, map[i].value[j].file_id,
+			       map[i].value[j].field_mask);
 		}
 	}
 }
@@ -135,17 +135,32 @@ void build_path_map(IndexedFile ifile) {
 	token = strtok(path, delimeter);
 
 	while (token != NULL) {
-		TokenMap *entry = shgetp_null(token_map, token);
+		TokenEntry *entry = shgetp_null(token_map, token);
 		if (!entry) {
 			shput(token_map, token, NULL);
 			entry = shgetp(token_map, token);
 		}
-		char *stable_path = duplicate_string(ifile.path);
-		if (stable_path == NULL) {
-			perror("malloc failed");
-			return;
+		
+		Posting value = {ifile.file_id};
+		uint8_t field_mask = 0b000;
+
+
+		
+		if (strcmp(token, ifile.ext) == 0) {
+			field_mask |= 0b1;
 		}
-		TokenValue value = {ifile.file_id, stable_path};
+		else {
+			char filename[PATH_MAX];
+			snprintf(filename, sizeof(filename), "%s.%s", token, ifile.ext);
+			if (strcmp(filename, ifile.filename) == 0) {
+				field_mask |= 0b110;
+			} else {
+				field_mask |= 0b100;
+			}
+		}
+
+		value.field_mask = field_mask;
+
 		arrput(entry->value, value);
 
 		token = strtok(NULL, delimeter);
@@ -238,15 +253,12 @@ long get_file_count(void) { return (long)file_records_len; }
 
 size_t get_output_len(void) { return output_len; }
 
-TokenMap* get_token_map(void) { return token_map;}
+TokenEntry* get_token_map(void) { return token_map;}
 
 void clear_file_paths(void) {
 	if (token_map != NULL) {
 		for (ptrdiff_t i = 0; i < shlen(token_map); ++i) {
-			TokenValue *values = token_map[i].value;
-			for (ptrdiff_t j = 0; j < arrlen(values); ++j) {
-				free(values[j].filepath);
-			}
+			Posting *values = token_map[i].value;
 			arrfree(values);
 		}
 		shfree(token_map);
