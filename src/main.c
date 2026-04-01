@@ -9,7 +9,7 @@
 int main(void) {
 	const char *base = "/Users/ambroseblay/developer/ambrafind";
 
-	build_blob(base);
+	build_index(base);
 
 	#ifdef DEBUG
 		printf("--- Debug: Map State ---\n");

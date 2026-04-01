@@ -42,8 +42,8 @@ void print_my_map(TokenEntry *map) {
 
 		ptrdiff_t count = arrlen(map[i].value);
 		for (ptrdiff_t j = 0; j < count; ++j) {
-			printf("  [%td] ID: %d, Field_Mask: %d\n", j, map[i].value[j].file_id,
-			       map[i].value[j].field_mask);
+			printf("  [%td] ID: %d, Field_Mask: %d\n", j,
+			       map[i].value[j].file_id, map[i].value[j].field_mask);
 		}
 	}
 }
@@ -71,6 +71,13 @@ void print_blob_and_records(const char *blob) {
 		       blob + r->path_offset, r->ext_offset, blob + r->ext_offset,
 		       r->size, r->mtime);
 	}
+}
+
+int token_cmpr(const void *a, const void *b) {
+	const TokenEntry* t_a = (const TokenEntry*) a;
+	const TokenEntry *t_b = (const TokenEntry *)b;
+
+	return strcmp(t_a->key, t_b->key);
 }
 
 static int append_string(const char *value, uint32_t *offset) {
@@ -140,16 +147,13 @@ void build_path_map(IndexedFile ifile) {
 			shput(token_map, token, NULL);
 			entry = shgetp(token_map, token);
 		}
-		
+
 		Posting value = {ifile.file_id};
 		uint8_t field_mask = 0b000;
 
-
-		
 		if (strcmp(token, ifile.ext) == 0) {
 			field_mask |= 0b1;
-		}
-		else {
+		} else {
 			char filename[PATH_MAX];
 			snprintf(filename, sizeof(filename), "%s.%s", token, ifile.ext);
 			if (strcmp(filename, ifile.filename) == 0) {
@@ -205,36 +209,36 @@ void build_blob(const char *base) {
 			                      ? dot + 1
 			                      : "";
 
-			//   FileRecord fr = {0};
-			//   int code = append_string(filename, &fr.filename_offset);
-			//   if (code != 0) {
-			// 	perror("realloc failed");
-			// 	closedir(dir);
-			// 	return;
-			//   }
+			FileRecord fr;
+			int code = append_string(filename, &fr.filename_offset);
+			if (code != 0) {
+				perror("realloc failed");
+				closedir(dir);
+				return;
+			}
 
-			//   code = append_string(path, &fr.path_offset);
-			//   if (code != 0) {
-			// 	perror("realloc failed");
-			// 	closedir(dir);
-			// 	return;
-			//   }
+			code = append_string(path, &fr.path_offset);
+			if (code != 0) {
+				perror("realloc failed");
+				closedir(dir);
+				return;
+			}
 
-			//   code = append_string(ext, &fr.ext_offset);
-			//   if (code != 0) {
-			// 	perror("realloc failed");
-			// 	closedir(dir);
-			// 	return;
-			//   }
+			code = append_string(ext, &fr.ext_offset);
+			if (code != 0) {
+				perror("realloc failed");
+				closedir(dir);
+				return;
+			}
 
-			//   fr.size = (uint64_t)st.st_size;
-			//   fr.mtime = (int64_t)st.st_mtime;
-			//   code = append_file_record(&fr);
-			//   if (code != 0) {
-			// 	perror("realloc failed");
-			// 	closedir(dir);
-			// 	return;
-			//   }
+			fr.size = (uint64_t)st.st_size;
+			fr.mtime = (int64_t)st.st_mtime;
+			code = append_file_record(&fr);
+			if (code != 0) {
+				perror("realloc failed");
+				closedir(dir);
+				return;
+			}
 
 			IndexedFile ifile = {curr_file_id++, (char *)path, (char *)filename,
 			                     (char *)ext,    st.st_size,   st.st_mtime};
@@ -245,6 +249,12 @@ void build_blob(const char *base) {
 	closedir(dir);
 }
 
+void build_index(const char *base) {
+	build_blob(base);
+	qsort(token_map, shlen(token_map), sizeof(TokenEntry), token_cmpr);
+	
+}
+
 const char *get_output(void) { return output; }
 
 const FileRecord *get_file_records(void) { return file_records; }
@@ -253,7 +263,7 @@ long get_file_count(void) { return (long)file_records_len; }
 
 size_t get_output_len(void) { return output_len; }
 
-TokenEntry* get_token_map(void) { return token_map;}
+TokenEntry *get_token_map(void) { return token_map; }
 
 void clear_file_paths(void) {
 	if (token_map != NULL) {

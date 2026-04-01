@@ -73,4 +73,6 @@ void print_my_map(TokenEntry *map);
 void build_path_map(IndexedFile ifile);
 TokenEntry* get_token_map(void);
 
+void build_index(const char *base);
+
 #endif // MY_FUNCTIONS_H
