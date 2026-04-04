@@ -15,9 +15,19 @@
 static char *output = NULL;
 static size_t output_len = 0;
 static size_t output_cap = 0;
+
 static FileRecord *file_records = NULL;
 static size_t file_records_len = 0;
 static size_t file_records_cap = 0;
+
+static Posting *postings = NULL;
+static size_t postings_len = 0;
+static size_t postings_cap = 0;
+
+static DictEntry *dict_entries = NULL;
+static size_t dict_entry_len = 0;
+static size_t dict_entry_cap = 0;
+
 static uint64_t curr_file_id = 0;
 
 TokenEntry *token_map = NULL;
@@ -74,7 +84,7 @@ void print_blob_and_records(const char *blob) {
 }
 
 int token_cmpr(const void *a, const void *b) {
-	const TokenEntry* t_a = (const TokenEntry*) a;
+	const TokenEntry *t_a = (const TokenEntry *)a;
 	const TokenEntry *t_b = (const TokenEntry *)b;
 
 	return strcmp(t_a->key, t_b->key);
@@ -236,7 +246,6 @@ void build_blob(const char *base) {
 			code = append_file_record(&fr);
 			if (code != 0) {
 				perror("realloc failed");
-				closedir(dir);
 				return;
 			}
 
@@ -249,10 +258,77 @@ void build_blob(const char *base) {
 	closedir(dir);
 }
 
+static int append_posting(const Posting *posting) {
+	if (postings_len == postings_cap) {
+		size_t new_cap = postings_cap == 0 ? 128 : postings_cap * 2;
+		Posting *new_postings = realloc(postings, new_cap * sizeof(Posting));
+		if (new_postings == NULL) {
+			return -1;
+		}
+
+		postings = new_postings;
+		postings_cap = new_cap;
+	}
+
+	postings[postings_len++] = *posting;
+	return 0;
+}
+
+static int append_dict_entry(const DictEntry *dict_entry) {
+	if (dict_entry_len == dict_entry_cap) {
+		size_t new_cap = dict_entry_cap == 0 ? 128 : dict_entry_cap * 2;
+		DictEntry *new_entries =
+		    realloc(dict_entries, new_cap * sizeof(DictEntry));
+		if (new_entries == NULL) {
+			return -1;
+		}
+		dict_entries = new_entries;
+		dict_entry_cap = new_cap;
+	}
+
+	dict_entries[dict_entry_len++] = *dict_entry;
+	return 0;
+}
+
+void build_postings_and_dict(TokenEntry *token_map) {
+
+	uint32_t postings_offset = 0;
+	int code;
+
+	if (token_map != NULL) {
+		for (ptrdiff_t i = 0; i < shlen(token_map); ++i) {
+			Posting *values = token_map[i].value;
+			ptrdiff_t n = arrlen(values);
+
+			for (ptrdiff_t j = 0; j < n; ++i) {
+				code = append_posting(&values[i]);
+
+				if (code != 0) {
+					perror("realloc failed");
+					return;
+				}
+			}
+			DictEntry entry;
+			code = append_string(token_map[i].key, &entry.token_offset);
+			if (code != 0) {
+				perror("realloc failed");
+				return;
+			}
+			entry.postings_offset = postings_offset;
+			entry.postings_count = n;
+			code = append_dict_entry(&entry);
+			if (code != 0) {
+				perror("realloc failed");
+				return;
+			}
+		}
+	}
+}
+
 void build_index(const char *base) {
 	build_blob(base);
 	qsort(token_map, shlen(token_map), sizeof(TokenEntry), token_cmpr);
-	
+	build_postings_and_dict(token_map);
 }
 
 const char *get_output(void) { return output; }
