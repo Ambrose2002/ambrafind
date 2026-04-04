@@ -12,26 +12,48 @@
 #include "../include/index.h"
 #include "../lib/stb_ds.h"
 
+/**
+ * String blob storage used by the index builder.
+ * `output` stores NUL-terminated strings; length/capacity track bytes.
+ */
 static char *output = NULL;
 static size_t output_len = 0;
 static size_t output_cap = 0;
 
+/**
+ * File metadata records produced while crawling the filesystem.
+ */
 static FileRecord *file_records = NULL;
 static size_t file_records_len = 0;
 static size_t file_records_cap = 0;
 
+/**
+ * Flattened postings list emitted from token hash entries.
+ */
 static Posting *postings = NULL;
 static size_t postings_len = 0;
 static size_t postings_cap = 0;
 
+/**
+ * Dictionary entries emitted alongside the flattened postings list.
+ */
 static DictEntry *dict_entries = NULL;
 static size_t dict_entry_len = 0;
 static size_t dict_entry_cap = 0;
 
+/**
+ * Monotonic file identifier assigned during recursive directory traversal.
+ */
 static uint64_t curr_file_id = 0;
 
+/**
+ * Token -> postings hash map (stb_ds string hash table).
+ */
 TokenEntry *token_map = NULL;
 
+/**
+ * Returns a heap-allocated copy of `src`, including the NUL terminator.
+ */
 static char *duplicate_string(const char *src) {
 	size_t len = strlen(src) + 1;
 	char *copy = malloc(len);
@@ -83,6 +105,9 @@ void print_blob_and_records(const char *blob) {
 	}
 }
 
+/**
+ * Comparator used to lexicographically sort token map entries by key.
+ */
 int token_cmpr(const void *a, const void *b) {
 	const TokenEntry *t_a = (const TokenEntry *)a;
 	const TokenEntry *t_b = (const TokenEntry *)b;
@@ -90,6 +115,10 @@ int token_cmpr(const void *a, const void *b) {
 	return strcmp(t_a->key, t_b->key);
 }
 
+/**
+ * Appends a string and its NUL terminator to the global string blob.
+ * When `offset` is non-NULL, writes the starting byte offset.
+ */
 static int append_string(const char *value, uint32_t *offset) {
 	size_t value_len = strlen(value);
 	size_t needed = output_len + value_len + 1; // terminator
@@ -121,6 +150,9 @@ static int append_string(const char *value, uint32_t *offset) {
 	return 0;
 }
 
+/**
+ * Appends a single file record to the global file record buffer.
+ */
 static int append_file_record(const FileRecord *record) {
 	if (file_records_len == file_records_cap) {
 		size_t new_cap = file_records_cap == 0 ? 128 : file_records_cap * 2;
@@ -258,6 +290,9 @@ void build_blob(const char *base) {
 	closedir(dir);
 }
 
+/**
+ * Appends one posting to the flattened global postings array.
+ */
 static int append_posting(const Posting *posting) {
 	if (postings_len == postings_cap) {
 		size_t new_cap = postings_cap == 0 ? 128 : postings_cap * 2;
@@ -274,6 +309,9 @@ static int append_posting(const Posting *posting) {
 	return 0;
 }
 
+/**
+ * Appends one dictionary entry to the global dictionary buffer.
+ */
 static int append_dict_entry(const DictEntry *dict_entry) {
 	if (dict_entry_len == dict_entry_cap) {
 		size_t new_cap = dict_entry_cap == 0 ? 128 : dict_entry_cap * 2;
@@ -290,6 +328,11 @@ static int append_dict_entry(const DictEntry *dict_entry) {
 	return 0;
 }
 
+/**
+ * Converts per-token postings (stored in `token_map`) into:
+ * - a flattened postings array (`postings`)
+ * - dictionary entries (`dict_entries`) with offsets/counts into that array
+ */
 void build_postings_and_dict(TokenEntry *token_map) {
 
 	uint32_t postings_offset = 0;
@@ -300,8 +343,8 @@ void build_postings_and_dict(TokenEntry *token_map) {
 			Posting *values = token_map[i].value;
 			ptrdiff_t n = arrlen(values);
 
-			for (ptrdiff_t j = 0; j < n; ++i) {
-				code = append_posting(&values[i]);
+			for (ptrdiff_t j = 0; j < n; ++j) {
+				code = append_posting(&values[j]);
 
 				if (code != 0) {
 					perror("realloc failed");
@@ -321,6 +364,7 @@ void build_postings_and_dict(TokenEntry *token_map) {
 				perror("realloc failed");
 				return;
 			}
+			postings_offset += n;
 		}
 	}
 }
@@ -341,7 +385,7 @@ size_t get_output_len(void) { return output_len; }
 
 TokenEntry *get_token_map(void) { return token_map; }
 
-void clear_file_paths(void) {
+void free_memory(void) {
 	if (token_map != NULL) {
 		for (ptrdiff_t i = 0; i < shlen(token_map); ++i) {
 			Posting *values = token_map[i].value;
@@ -353,11 +397,22 @@ void clear_file_paths(void) {
 
 	free(output);
 	free(file_records);
+	free(postings);
+	free(dict_entries);
+
 	output = NULL;
 	file_records = NULL;
+	postings = NULL;
+	dict_entries = NULL;
+
 	output_len = 0;
 	output_cap = 0;
 	file_records_len = 0;
 	file_records_cap = 0;
+	postings_len = 0;
+	postings_cap = 0;
+	dict_entry_len = 0;
+	dict_entry_cap = 0;
+
 	curr_file_id = 0;
 }

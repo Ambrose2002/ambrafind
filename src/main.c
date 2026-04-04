@@ -18,6 +18,6 @@ int main(void) {
 		// print_blob_and_records(get_output());
 	#endif
 
-	clear_file_paths();
+	free_memory();
 	return 0;
 }

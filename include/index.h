@@ -116,7 +116,7 @@ long get_file_count(void);
 /**
  * Releases all internal index-building allocations and resets global state.
  */
-void clear_file_paths(void);
+void free_memory(void);
 
 /**
  * Returns the current size in bytes of the internal string blob buffer.
