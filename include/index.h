@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 #ifdef DEBUG
-	#define DEBUG_PRINT(...) printf(__VA_ARGS__)
+#define DEBUG_PRINT(...) printf(__VA_ARGS__)
 #else
-	#define DEBUG_PRINT(...)
+#define DEBUG_PRINT(...)
 #endif
 
 /**
@@ -62,7 +62,7 @@ typedef struct {
  */
 typedef struct {
 	char *key;
-	Posting* value;
+	Posting *value;
 } TokenEntry;
 
 /**
@@ -74,8 +74,10 @@ typedef struct {
 	uint32_t file_count;
 	uint32_t dict_count;
 	uint32_t postings_count;
+	uint32_t string_blob_size;
 	uint32_t file_records_offset;
 	uint32_t string_blob_offset;
+	uint32_t dict_offset;
 	uint32_t postings_offset;
 } IndexHeader;
 
@@ -146,6 +148,6 @@ TokenEntry *get_token_map(void);
 /**
  * Builds index state for `base` and sorts token entries lexicographically.
  */
-void build_index(const char *base);
+int build_index(const char *base);
 
 #endif // MY_FUNCTIONS_H

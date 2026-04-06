@@ -278,6 +278,7 @@ void build_blob(const char *base) {
 			code = append_file_record(&fr);
 			if (code != 0) {
 				perror("realloc failed");
+				closedir(dir);
 				return;
 			}
 
@@ -369,10 +370,39 @@ void build_postings_and_dict(TokenEntry *token_map) {
 	}
 }
 
-void build_index(const char *base) {
+int build_index(const char *base) {
 	build_blob(base);
 	qsort(token_map, shlen(token_map), sizeof(TokenEntry), token_cmpr);
 	build_postings_and_dict(token_map);
+	IndexHeader header;
+	header.version = 1.0;
+	header.file_count = file_records_len;
+	header.dict_count = dict_entry_len;
+	header.postings_count = postings_len;
+	header.string_blob_size = output_len;
+
+	header.file_records_offset = sizeof(IndexHeader) + 1;
+	header.string_blob_offset = header.file_records_offset + file_records_cap + 1;
+	header.dict_offset = header.string_blob_offset + output_cap + 1;
+	header.postings_offset = header.dict_offset + dict_entry_cap + 1;
+
+
+
+	FILE *fptr = fopen("index.bin", "wb");
+	if (fptr == NULL) {
+		perror("Error opening file");
+		return 1;
+	}
+
+	fwrite(&header, sizeof(IndexHeader), 1, fptr);
+	fwrite(file_records, sizeof(FileRecord), file_records_cap, fptr);
+	fwrite(output, sizeof(char), output_cap, fptr);
+	fwrite(dict_entries, sizeof(DictEntry), dict_entry_cap, fptr);
+	fwrite(postings, sizeof(Posting), postings_cap, fptr);
+	
+
+	fclose(fptr);
+	return 0;
 }
 
 const char *get_output(void) { return output; }
